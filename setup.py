@@ -11,7 +11,7 @@ def rel_path(path):
 
 
 def get_version():
-    with open(rel_path(os.path.join("paperweight", "__init__.py"))) as f:
+    with open(rel_path(os.path.join("magphysio", "__init__.py"))) as f:
         for line in f:
             if line.startswith("VERSION"):
                 version = re.findall(r'\"(.+?)\"', line)[0]
@@ -27,7 +27,7 @@ except IOError:
 setup(
     name="magphysio",
     version=get_version(),
-    packages=find_packages,
+    packages=find_packages(),
     # install_requires=['Jinja2'],
     author="Jonathan Sick",
     author_email="jonathansick@mac.com",
@@ -35,5 +35,5 @@ setup(
     long_description=long_description,
     license="MIT",
     keywords="astronomy",
-    url="http://github.com/jonathansick/magphysio",
+    url="http://github.com/jonathansick/magphysio"
 )
