@@ -55,6 +55,31 @@ class BaseReader(object):
              "97.5": percentiles[4]}
         return d
 
+    def persist(self, f):
+        """Persist the MAGPHYS fit to a hierarchical HDF5 file.
+
+        Dataset is stored in the group `/models/{galaxy_id}`.
+        """
+        group = f["models/{0}".format(self.galaxy_id)]
+
+        # Persist SED
+        sed = np.vstack([self.sed.T, self.sed_err.T, self.model_sed.T])
+        group['sed'] = sed
+        group['sed'].attrs['bands'] = self.bands
+        group['sed'].attrs['i_sh'] = self.i_sfh
+        group['sed'].attrs['chi2'] = self.chi2
+
+        # Persist PDFs
+        for k, doc in self._pdfs.iteritems():
+            group[k] = np.vstack([doc['bins'].T, doc['probs'].T])
+            dset = group[k]
+            dset.attrs['name'] = k
+            dset.attrs['2.5'] = doc['2.5']
+            dset.attrs['16'] = doc['16']
+            dset.attrs['50'] = doc['50']
+            dset.attrs['84'] = doc['84']
+            dset.attrs['97.5'] = doc['97.5']
+
 
 class OpticalFit(BaseReader):
     """A MAGPHYS model fit for Roediger's fit_magphys_opt.exe mod."""
