@@ -95,13 +95,16 @@ class BaseReader(object):
 
 class OpticalFit(BaseReader):
     """A MAGPHYS model fit for Roediger's fit_magphys_opt.exe mod."""
-    def __init__(self, galaxy_id, fit_path):
+    def __init__(self, galaxy_id, fit_obj):
         super(OpticalFit, self).__init__()
         self.galaxy_id = galaxy_id
         self._pdfs = {}
 
-        with open(fit_path) as fit_file:
-            fit_lines = fit_file.readlines()
+        if type(fit_obj) is str:
+            with open(fit_obj) as fit_file:
+                fit_lines = fit_file.readlines()
+        else:
+            fit_lines = fit_obj.readlines()  # already a file object
         self.bands, self.sed, self.sed_err = OpticalFit._parse_observed_sed(
             fit_lines)
         _, self.model_sed = OpticalFit._parse_model_sed(fit_lines)
