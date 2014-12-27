@@ -55,12 +55,24 @@ class BaseReader(object):
              "97.5": percentiles[4]}
         return d
 
-    def persist(self, f):
+    def persist(self, f, path=None):
         """Persist the MAGPHYS fit to a hierarchical HDF5 file.
 
-        Dataset is stored in the group `/models/{galaxy_id}`.
+        By default, the dataset is stored in the group `/models/{galaxy_id}`.
+
+        e.g.::
+
+            import h5py
+            f = h5py.File("test.hdf5", "a")
+            model.persist(f)
         """
-        group = f["models/{0}".format(self.galaxy_id)]
+        if path is None:
+            path = "models/{0}".format(self.galaxy_id)
+        if path in f:
+            # Delete existing fit archives
+            del f[path]
+        f.create_group(path)
+        group = f[path]
 
         # Persist SED
         sed = np.vstack([self.sed.T, self.sed_err.T, self.model_sed.T])
