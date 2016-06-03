@@ -93,6 +93,42 @@ class BaseReader(object):
             dset.attrs['97.5'] = doc['97.5']
 
 
+class MagphysFit(BaseReader):
+    """A regular MAGPHYS model fit."""
+    def __init__(self, galaxy_id, fit_obj):
+        super(MagphysFit, self).__init__()
+        self.galaxy_id = galaxy_id
+        self._pdfs = {}
+
+        if type(fit_obj) is str:
+            with open(fit_obj) as fit_file:
+                fit_lines = fit_file.readlines()
+        else:
+            fit_lines = fit_obj.readlines()  # already a file object
+
+        self.bands, self.sed, self.sed_err = self._parse_observed_sed(
+            fit_lines)
+        _, self.model_sed = self._parse_model_sed(fit_lines)
+
+        self.i_sfh, self.chi2, self.z = self._parse_best_fit(fit_lines)
+        self._pdfs['f_mu_sfh'] = self._parse_pdf(fit_lines, 16, 37)
+        self._pdfs['f_mu_ir'] = self._parse_pdf(fit_lines, 39, 60)
+        self._pdfs['mu'] = self._parse_pdf(fit_lines, 62, 83)
+        self._pdfs['tau_V'] = self._parse_pdf(fit_lines, 85, 134)
+        self._pdfs['sSFR_0.1Gyr'] = self._parse_pdf(fit_lines, 136, 207)
+        self._pdfs['log_Mstar'] = self._parse_pdf(fit_lines, 209, 270)
+        self._pdfs['log_Ldust'] = self._parse_pdf(fit_lines, 272, 333)
+        self._pdfs['T_C_ISM'] = self._parse_pdf(fit_lines, 335, 346)
+        self._pdfs['T_W_BC'] = self._parse_pdf(fit_lines, 348, 379)
+        self._pdfs['xi_C_tot'] = self._parse_pdf(fit_lines, 381, 402)
+        self._pdfs['xi_PAH_tot'] = self._parse_pdf(fit_lines, 404, 425)
+        self._pdfs['xi_MIR_tot'] = self._parse_pdf(fit_lines, 427, 448)
+        self._pdfs['xi_W_tot'] = self._parse_pdf(fit_lines, 450, 471)
+        self._pdfs['tau_V_ISM'] = self._parse_pdf(fit_lines, 473, 554)
+        self._pdfs['log_Mdust'] = self._parse_pdf(fit_lines, 556, 617)
+        self._pdfs['SFR_0.1Gyr'] = self._parse_pdf(fit_lines, 619, 680)
+
+
 class OpticalFit(BaseReader):
     """A MAGPHYS model fit for Roediger's fit_magphys_opt.exe mod."""
     def __init__(self, galaxy_id, fit_obj):
