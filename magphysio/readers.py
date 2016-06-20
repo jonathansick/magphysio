@@ -40,7 +40,7 @@ class BaseReader(object):
         n_bins = end_n - start_n
         bins = np.empty(n_bins, dtype=np.float)
         probs = np.empty(n_bins, dtype=np.float)
-        print(lines[start_n - 1])
+        # print(lines[start_n - 1])
         for i, line in enumerate(lines[start_n:end_n]):
             b, p = map(float, line.strip().split())
             bins[i] = b
@@ -127,6 +127,48 @@ class MagphysFit(BaseReader):
         self._pdfs['tau_V_ISM'] = self._parse_pdf(fit_lines, 473, 554)
         self._pdfs['log_Mdust'] = self._parse_pdf(fit_lines, 556, 617)
         self._pdfs['SFR_0.1Gyr'] = self._parse_pdf(fit_lines, 619, 680)
+
+
+class EnhancedMagphysFit(BaseReader):
+    """A enhanced MAGPHYS model fit that includes metallicity, age, etc fit."""
+    def __init__(self, galaxy_id, fit_obj):
+        super(EnhancedMagphysFit, self).__init__()
+        self.galaxy_id = galaxy_id
+        self._pdfs = {}
+
+        if type(fit_obj) is str:
+            with open(fit_obj) as fit_file:
+                fit_lines = fit_file.readlines()
+        else:
+            fit_lines = fit_obj.readlines()  # already a file object
+
+        self.bands, self.sed, self.sed_err = self._parse_observed_sed(
+            fit_lines)
+        _, self.model_sed = self._parse_model_sed(fit_lines)
+
+        self.i_sfh, self.chi2, self.z = self._parse_best_fit(fit_lines)
+        self._pdfs['Z_Zo'] = self._parse_pdf(fit_lines, 16, 120)
+        self._pdfs['tform'] = self._parse_pdf(fit_lines, 122, 258)
+        self._pdfs['gamma'] = self._parse_pdf(fit_lines, 260, 361)
+        self._pdfs['t_lastB'] = self._parse_pdf(fit_lines, 363, 500)
+        self._pdfs['log_age_M'] = self._parse_pdf(fit_lines, 502, 628)
+
+        self._pdfs['f_mu_sfh'] = self._parse_pdf(fit_lines, 630, 651)
+        self._pdfs['f_mu_ir'] = self._parse_pdf(fit_lines, 653, 674)
+        self._pdfs['mu'] = self._parse_pdf(fit_lines, 676, 697)
+        self._pdfs['tau_V'] = self._parse_pdf(fit_lines, 699, 748)
+        self._pdfs['sSFR_0.1Gyr'] = self._parse_pdf(fit_lines, 750, 821)
+        self._pdfs['log_Mstar'] = self._parse_pdf(fit_lines, 823, 884)
+        self._pdfs['log_Ldust'] = self._parse_pdf(fit_lines, 886, 947)
+        self._pdfs['T_C_ISM'] = self._parse_pdf(fit_lines, 949, 960)
+        self._pdfs['T_W_BC'] = self._parse_pdf(fit_lines, 962, 993)
+        self._pdfs['xi_C_tot'] = self._parse_pdf(fit_lines, 995, 1016)
+        self._pdfs['xi_PAH_tot'] = self._parse_pdf(fit_lines, 1018, 1039)
+        self._pdfs['xi_MIR_tot'] = self._parse_pdf(fit_lines, 1041, 1062)
+        self._pdfs['xi_W_tot'] = self._parse_pdf(fit_lines, 1064, 1085)
+        self._pdfs['tau_V_ISM'] = self._parse_pdf(fit_lines, 1087, 1168)
+        self._pdfs['log_Mdust'] = self._parse_pdf(fit_lines, 1170, 1231)
+        self._pdfs['SFR_0.1Gyr'] = self._parse_pdf(fit_lines, 1233, 1294)
 
 
 class OpticalFit(BaseReader):
