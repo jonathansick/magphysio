@@ -12,6 +12,7 @@ import numpy as np
 class BaseReader(object):
     def __init__(self):
         super(BaseReader, self).__init__()
+        self._full_sed = None
 
     @staticmethod
     def _parse_observed_sed(lines, index=1):
@@ -74,12 +75,15 @@ class BaseReader(object):
         f.create_group(path)
         group = f[path]
 
-        # Persist SED
+        # Persist SED (per bandpass)
         sed = np.vstack([self.sed.T, self.sed_err.T, self.model_sed.T])
         group['sed'] = sed
         group['sed'].attrs['bands'] = self.bands
         group['sed'].attrs['i_sh'] = self.i_sfh
         group['sed'].attrs['chi2'] = self.chi2
+
+        # Perist *full SED* (wavelength grid)
+        group['full_sed'] = self._full_sed
 
         # Persist PDFs
         for k, doc in self._pdfs.iteritems():
@@ -131,7 +135,7 @@ class MagphysFit(BaseReader):
 
 class EnhancedMagphysFit(BaseReader):
     """A enhanced MAGPHYS model fit that includes metallicity, age, etc fit."""
-    def __init__(self, galaxy_id, fit_obj):
+    def __init__(self, galaxy_id, fit_obj, sed_obj=None):
         super(EnhancedMagphysFit, self).__init__()
         self.galaxy_id = galaxy_id
         self._pdfs = {}
@@ -169,6 +173,14 @@ class EnhancedMagphysFit(BaseReader):
         self._pdfs['tau_V_ISM'] = self._parse_pdf(fit_lines, 1087, 1168)
         self._pdfs['log_Mdust'] = self._parse_pdf(fit_lines, 1170, 1231)
         self._pdfs['SFR_0.1Gyr'] = self._parse_pdf(fit_lines, 1233, 1294)
+
+        if sed_obj is not None:
+            # ...Spectral Energy Distribution [lg(L_lambda/LoA^-1)]:
+            # ...lg(lambda/A)...Attenuated...Unattenuated
+            dt = np.dtype([('log_lambda_A', np.float),
+                           ('log_L_Attenuated', np.float),
+                           ('log_L_Unattenuated', np.float)])
+            self._full_sed = np.loadtxt(sed_obj, skiprows=10, dtype=dt)
 
 
 class OpticalFit(BaseReader):
