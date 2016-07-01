@@ -83,7 +83,8 @@ class BaseReader(object):
         group['sed'].attrs['chi2'] = self.chi2
 
         # Perist *full SED* (wavelength grid)
-        group['full_sed'] = self._full_sed
+        if self._full_sed is not None:
+            group['full_sed'] = self._full_sed
 
         # Persist PDFs
         for k, doc in self._pdfs.iteritems():
@@ -185,7 +186,7 @@ class EnhancedMagphysFit(BaseReader):
 
 class OpticalFit(BaseReader):
     """A MAGPHYS model fit for Roediger's fit_magphys_opt.exe mod."""
-    def __init__(self, galaxy_id, fit_obj):
+    def __init__(self, galaxy_id, fit_obj, sed_obj=None):
         super(OpticalFit, self).__init__()
         self.galaxy_id = galaxy_id
         self._pdfs = {}
