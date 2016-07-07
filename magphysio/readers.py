@@ -100,7 +100,7 @@ class BaseReader(object):
 
 class MagphysFit(BaseReader):
     """A regular MAGPHYS model fit."""
-    def __init__(self, galaxy_id, fit_obj):
+    def __init__(self, galaxy_id, fit_obj, sed_obj=None):
         super(MagphysFit, self).__init__()
         self.galaxy_id = galaxy_id
         self._pdfs = {}
@@ -132,6 +132,14 @@ class MagphysFit(BaseReader):
         self._pdfs['tau_V_ISM'] = self._parse_pdf(fit_lines, 473, 554)
         self._pdfs['log_Mdust'] = self._parse_pdf(fit_lines, 556, 617)
         self._pdfs['SFR_0.1Gyr'] = self._parse_pdf(fit_lines, 619, 680)
+
+        if sed_obj is not None:
+            # ...Spectral Energy Distribution [lg(L_lambda/LoA^-1)]:
+            # ...lg(lambda/A)...Attenuated...Unattenuated
+            dt = np.dtype([('log_lambda_A', np.float),
+                           ('log_L_Attenuated', np.float),
+                           ('log_L_Unattenuated', np.float)])
+            self._full_sed = np.loadtxt(sed_obj, skiprows=10, dtype=dt)
 
 
 class EnhancedMagphysFit(BaseReader):
