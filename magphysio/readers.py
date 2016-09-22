@@ -8,6 +8,9 @@ Python readers/representation of MAGPHYS result files.
 
 import numpy as np
 
+import astropy.units as u
+import astropy.constants as const
+
 
 class BaseReader(object):
     def __init__(self):
@@ -15,16 +18,28 @@ class BaseReader(object):
         self._full_sed = None
 
     @staticmethod
+    def convert_LsunHz_to_Jy(Lsun_Hz, distance=785 * u.kpc):
+        """Convert the flux reported by MAGPHYS, in units L_sun / Hz, to Jy."""
+        f_sun = (const.L_sun.cgs / (4. * np.pi * distance ** 2)).decompose(
+            bases=[u.erg, u.cm, u.s])
+        f = (Lsun_Hz / u.Hz * f_sun).to(u.Jy)
+        assert f.unit == u.Jy
+        return f.value
+
+    @staticmethod
     def _parse_observed_sed(lines, index=1):
         bands = lines[index].replace('#', '').strip().split()
-        sed = np.array(map(float, lines[index + 1].strip().split()))
-        err = np.array(map(float, lines[index + 2].strip().split()))
+        sed = BaseReader.convert_LsunHz_to_Jy(
+            np.array(map(float, lines[index + 1].strip().split())))
+        err = BaseReader.convert_LsunHz_to_Jy(
+            np.array(map(float, lines[index + 2].strip().split())))
         return bands, sed, err
 
     @staticmethod
     def _parse_model_sed(lines, index=11):
         bands = lines[index].replace('#', '').strip().split()
-        sed = np.array(map(float, lines[index + 1].strip().split()))
+        sed = BaseReader.convert_LsunHz_to_Jy(
+            np.array(map(float, lines[index + 1].strip().split())))
         return bands, sed
 
     @staticmethod
