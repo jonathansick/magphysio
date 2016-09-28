@@ -8,23 +8,37 @@ Python readers/representation of MAGPHYS result files.
 
 import numpy as np
 
+import astropy.units as u
+import astropy.constants as const
+
 
 class BaseReader(object):
-    def __init__(self):
+    def __init__(self, distance=785. * u.kpc):
         super(BaseReader, self).__init__()
+        self._distance = distance
         self._full_sed = None
 
-    @staticmethod
-    def _parse_observed_sed(lines, index=1):
+    def convert_LsunHz_to_Jy(self, Lsun_Hz):
+        """Convert the flux reported by MAGPHYS, in units L_sun / Hz, to Jy."""
+        f_sun = (const.L_sun.cgs /
+                 (4. * np.pi * self._distance ** 2)).decompose(
+            bases=[u.erg, u.cm, u.s])
+        f = (Lsun_Hz / u.Hz * f_sun).to(u.Jy)
+        assert f.unit == u.Jy
+        return f.value
+
+    def _parse_observed_sed(self, lines, index=1):
         bands = lines[index].replace('#', '').strip().split()
-        sed = np.array(map(float, lines[index + 1].strip().split()))
-        err = np.array(map(float, lines[index + 2].strip().split()))
+        sed = self.convert_LsunHz_to_Jy(
+            np.array(map(float, lines[index + 1].strip().split())))
+        err = self.convert_LsunHz_to_Jy(
+            np.array(map(float, lines[index + 2].strip().split())))
         return bands, sed, err
 
-    @staticmethod
-    def _parse_model_sed(lines, index=11):
+    def _parse_model_sed(self, lines, index=11):
         bands = lines[index].replace('#', '').strip().split()
-        sed = np.array(map(float, lines[index + 1].strip().split()))
+        sed = self.convert_LsunHz_to_Jy(
+            np.array(map(float, lines[index + 1].strip().split())))
         return bands, sed
 
     @staticmethod
@@ -144,8 +158,9 @@ class MagphysFit(BaseReader):
 
 class EnhancedMagphysFit(BaseReader):
     """A enhanced MAGPHYS model fit that includes metallicity, age, etc fit."""
-    def __init__(self, galaxy_id, fit_obj, sed_obj=None):
-        super(EnhancedMagphysFit, self).__init__()
+    def __init__(self, galaxy_id, fit_obj, distance=785. * u.kpc,
+                 sed_obj=None):
+        super(EnhancedMagphysFit, self).__init__(distance=distance)
         self.galaxy_id = galaxy_id
         self._pdfs = {}
 
@@ -186,10 +201,26 @@ class EnhancedMagphysFit(BaseReader):
         if sed_obj is not None:
             # ...Spectral Energy Distribution [lg(L_lambda/LoA^-1)]:
             # ...lg(lambda/A)...Attenuated...Unattenuated
-            dt = np.dtype([('log_lambda_A', np.float),
-                           ('log_L_Attenuated', np.float),
-                           ('log_L_Unattenuated', np.float)])
+            dt = np.dtype([('lambda', np.float),
+                           ('sed_attenuated', np.float),
+                           ('sed_unattenuated', np.float)])
             self._full_sed = np.loadtxt(sed_obj, skiprows=10, dtype=dt)
+
+            # convert wavelength from log angstrom to microns
+            log_angstrom = self._full_sed['lambda']
+            lamb = ((10. ** log_angstrom) * u.angstrom).to(u.micron)
+            self._full_sed['lambda'] = lamb.value
+
+            # convert full SED to log (lambda L / L_sun)
+            attenuated = np.log10(lamb.to(u.angstrom) *
+                                  10. ** self._full_sed['sed_attenuated'] /
+                                  u.angstrom)
+            self._full_sed['sed_attenuated'] = attenuated
+
+            unattenuated = np.log10(lamb.to(u.angstrom) *
+                                    10. ** self._full_sed['sed_unattenuated'] /
+                                    u.angstrom)
+            self._full_sed['sed_unattenuated'] = unattenuated
 
 
 class OpticalFit(BaseReader):
@@ -204,9 +235,9 @@ class OpticalFit(BaseReader):
                 fit_lines = fit_file.readlines()
         else:
             fit_lines = fit_obj.readlines()  # already a file object
-        self.bands, self.sed, self.sed_err = OpticalFit._parse_observed_sed(
+        self.bands, self.sed, self.sed_err = self._parse_observed_sed(
             fit_lines)
-        _, self.model_sed = OpticalFit._parse_model_sed(fit_lines)
+        _, self.model_sed = self._parse_model_sed(fit_lines)
         self.i_sfh, self.chi2, self.z = OpticalFit._parse_best_fit(fit_lines)
         self._pdfs['Z_Zo'] = OpticalFit._parse_pdf(fit_lines, 16, 120)
         self._pdfs['tform'] = OpticalFit._parse_pdf(fit_lines, 122, 258)
