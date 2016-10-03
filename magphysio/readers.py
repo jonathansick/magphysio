@@ -6,13 +6,41 @@ Python readers/representation of MAGPHYS result files.
 2014-12-17 - Created by Jonathan Sick
 """
 
+import re
 import numpy as np
+from collections import OrderedDict
 
 import astropy.units as u
 import astropy.constants as const
 
 
 class BaseReader(object):
+
+    # map magphys names to internal column names
+    magphys_params = OrderedDict([
+        ('Z/Zo', 'Z/Zo'),
+        ('tform', 'tform'),
+        ('gamma', 'gamma'),
+        ('t(lastB)', 't_lastB'),
+        ('log age(M)', 'log_age_M'),
+        ('f_mu (SFH)', 'f_mu_sfh'),
+        ('f_mu (IR)', 'f_mu_ir'),
+        ('mu parameter', 'mu'),
+        ('tau_V', 'tau_V'),
+        ('sSFR_0.1Gyr', 'sSFR_0.1Gyr'),
+        ('M(stars)', 'log_Mstar'),
+        ('Ldust', 'log_Ldust'),
+        ('T_C^ISM', 'T_C_ISM'),
+        ('T_W^BC', 'T_W_BC'),
+        ('xi_C^tot', 'xi_C_tot'),
+        ('xi_PAH^tot', 'xi_PAH_tot'),
+        ('xi_MIR^tot', 'xi_MIR_tot'),
+        ('xi_W^tot', 'xi_W_tot'),
+        ('tau_V^ISM', 'tau_V_ISM'),
+        ('M(dust)', 'log_Mdust'),
+        ('SFR_0.1Gyr', 'SFR_0.1Gyr'),
+    ])
+
     def __init__(self, distance=785. * u.kpc):
         super(BaseReader, self).__init__()
         self._distance = distance
@@ -55,7 +83,6 @@ class BaseReader(object):
         n_bins = end_n - start_n
         bins = np.empty(n_bins, dtype=np.float)
         probs = np.empty(n_bins, dtype=np.float)
-        # print(lines[start_n - 1])
         for i, line in enumerate(lines[start_n:end_n]):
             b, p = map(float, line.strip().split())
             bins[i] = b
@@ -69,6 +96,25 @@ class BaseReader(object):
              "84": percentiles[3],
              "97.5": percentiles[4]}
         return d
+
+    @staticmethod
+    def _detect_pdf_lines(lines):
+        pattern = "^# \.\.\.(.+)\.\.\.$"
+        p = re.compile(pattern)
+
+        pdf_lines = []
+        for i, line in enumerate(lines):
+            m = p.match(line)
+            if m is not None and i > 10:
+                pdf_lines.append((m.group(1).strip(), i))
+
+        limits = {}
+        for j, (key, start_i) in enumerate(pdf_lines):
+            try:
+                limits[key] = (start_i + 1, pdf_lines[j + 1][-1] - 1)
+            except IndexError:
+                limits[key] = (start_i + 1, i)
+        return limits
 
     def persist(self, f, path=None):
         """Persist the MAGPHYS fit to a hierarchical HDF5 file.
@@ -130,22 +176,14 @@ class MagphysFit(BaseReader):
         _, self.model_sed = self._parse_model_sed(fit_lines)
 
         self.i_sfh, self.chi2, self.z = self._parse_best_fit(fit_lines)
-        self._pdfs['f_mu_sfh'] = self._parse_pdf(fit_lines, 16, 37)
-        self._pdfs['f_mu_ir'] = self._parse_pdf(fit_lines, 39, 60)
-        self._pdfs['mu'] = self._parse_pdf(fit_lines, 62, 83)
-        self._pdfs['tau_V'] = self._parse_pdf(fit_lines, 85, 134)
-        self._pdfs['sSFR_0.1Gyr'] = self._parse_pdf(fit_lines, 136, 207)
-        self._pdfs['log_Mstar'] = self._parse_pdf(fit_lines, 209, 270)
-        self._pdfs['log_Ldust'] = self._parse_pdf(fit_lines, 272, 333)
-        self._pdfs['T_C_ISM'] = self._parse_pdf(fit_lines, 335, 346)
-        self._pdfs['T_W_BC'] = self._parse_pdf(fit_lines, 348, 379)
-        self._pdfs['xi_C_tot'] = self._parse_pdf(fit_lines, 381, 402)
-        self._pdfs['xi_PAH_tot'] = self._parse_pdf(fit_lines, 404, 425)
-        self._pdfs['xi_MIR_tot'] = self._parse_pdf(fit_lines, 427, 448)
-        self._pdfs['xi_W_tot'] = self._parse_pdf(fit_lines, 450, 471)
-        self._pdfs['tau_V_ISM'] = self._parse_pdf(fit_lines, 473, 554)
-        self._pdfs['log_Mdust'] = self._parse_pdf(fit_lines, 556, 617)
-        self._pdfs['SFR_0.1Gyr'] = self._parse_pdf(fit_lines, 619, 680)
+
+        pdf_lines = self._detect_pdf_lines(fit_lines)
+
+        for magphys_param, startend in pdf_lines.iteritems():
+            param_name = self.magphys_params[magphys_param]
+            start = startend[0]
+            end = startend[1]
+            self._pdfs[param_name] = self._parse_pdf(fit_lines, start, end)
 
         if sed_obj is not None:
             # ...Spectral Energy Distribution [lg(L_lambda/LoA^-1)]:
@@ -175,28 +213,14 @@ class EnhancedMagphysFit(BaseReader):
         _, self.model_sed = self._parse_model_sed(fit_lines)
 
         self.i_sfh, self.chi2, self.z = self._parse_best_fit(fit_lines)
-        self._pdfs['Z_Zo'] = self._parse_pdf(fit_lines, 16, 120)
-        self._pdfs['tform'] = self._parse_pdf(fit_lines, 122, 258)
-        self._pdfs['gamma'] = self._parse_pdf(fit_lines, 260, 361)
-        self._pdfs['t_lastB'] = self._parse_pdf(fit_lines, 363, 500)
-        self._pdfs['log_age_M'] = self._parse_pdf(fit_lines, 502, 628)
 
-        self._pdfs['f_mu_sfh'] = self._parse_pdf(fit_lines, 630, 651)
-        self._pdfs['f_mu_ir'] = self._parse_pdf(fit_lines, 653, 674)
-        self._pdfs['mu'] = self._parse_pdf(fit_lines, 676, 697)
-        self._pdfs['tau_V'] = self._parse_pdf(fit_lines, 699, 748)
-        self._pdfs['sSFR_0.1Gyr'] = self._parse_pdf(fit_lines, 750, 821)
-        self._pdfs['log_Mstar'] = self._parse_pdf(fit_lines, 823, 884)
-        self._pdfs['log_Ldust'] = self._parse_pdf(fit_lines, 886, 947)
-        self._pdfs['T_C_ISM'] = self._parse_pdf(fit_lines, 949, 960)
-        self._pdfs['T_W_BC'] = self._parse_pdf(fit_lines, 962, 993)
-        self._pdfs['xi_C_tot'] = self._parse_pdf(fit_lines, 995, 1016)
-        self._pdfs['xi_PAH_tot'] = self._parse_pdf(fit_lines, 1018, 1039)
-        self._pdfs['xi_MIR_tot'] = self._parse_pdf(fit_lines, 1041, 1062)
-        self._pdfs['xi_W_tot'] = self._parse_pdf(fit_lines, 1064, 1085)
-        self._pdfs['tau_V_ISM'] = self._parse_pdf(fit_lines, 1087, 1168)
-        self._pdfs['log_Mdust'] = self._parse_pdf(fit_lines, 1170, 1231)
-        self._pdfs['SFR_0.1Gyr'] = self._parse_pdf(fit_lines, 1233, 1294)
+        pdf_lines = self._detect_pdf_lines(fit_lines)
+
+        for magphys_param, startend in pdf_lines.iteritems():
+            param_name = self.magphys_params[magphys_param]
+            start = startend[0]
+            end = startend[1]
+            self._pdfs[param_name] = self._parse_pdf(fit_lines, start, end)
 
         if sed_obj is not None:
             # ...Spectral Energy Distribution [lg(L_lambda/LoA^-1)]:
@@ -238,37 +262,13 @@ class OpticalFit(BaseReader):
         self.bands, self.sed, self.sed_err = self._parse_observed_sed(
             fit_lines)
         _, self.model_sed = self._parse_model_sed(fit_lines)
-        self.i_sfh, self.chi2, self.z = OpticalFit._parse_best_fit(fit_lines)
-        self._pdfs['Z_Zo'] = OpticalFit._parse_pdf(fit_lines, 16, 120)
-        self._pdfs['tform'] = OpticalFit._parse_pdf(fit_lines, 122, 258)
-        self._pdfs['gamma'] = OpticalFit._parse_pdf(fit_lines, 260, 361)
-        self._pdfs['t_lastB'] = OpticalFit._parse_pdf(fit_lines, 363, 500)
-        self._pdfs['log_age_M'] = OpticalFit._parse_pdf(fit_lines, 502, 628)
-        self._pdfs['log_age_r'] = OpticalFit._parse_pdf(fit_lines, 630, 771)
-        self._pdfs['log_Mstar'] = OpticalFit._parse_pdf(fit_lines, 773, 874)
-        self._pdfs['SFR_0.1Gyr'] = OpticalFit._parse_pdf(fit_lines, 876, 937)
-        self._pdfs['sSFR_0.1Gyr'] = OpticalFit._parse_pdf(fit_lines, 939, 1010)
-        self._pdfs['mu'] = OpticalFit._parse_pdf(fit_lines, 1012, 1033)
-        self._pdfs['tau_V'] = OpticalFit._parse_pdf(fit_lines, 1035, 1157)
-        self._pdfs['tau_V_ISM'] = OpticalFit._parse_pdf(fit_lines, 1159, 1281)
 
-    @staticmethod
-    def _parse_pdf(lines, start_n, percentile_n):
-        end_n = percentile_n - 1  # line where the PDF grid ends
-        n_bins = end_n - start_n
-        bins = np.empty(n_bins, dtype=np.float)
-        probs = np.empty(n_bins, dtype=np.float)
-        print(lines[start_n - 1])
-        for i, line in enumerate(lines[start_n:end_n]):
-            b, p = map(float, line.strip().split())
-            bins[i] = b
-            probs[i] = p
-        percentiles = map(float, lines[percentile_n].strip().split())
-        d = {"bins": bins,
-             "probs": probs,
-             "2.5": percentiles[0],
-             "16": percentiles[1],
-             "50": percentiles[2],
-             "84": percentiles[3],
-             "97.5": percentiles[4]}
-        return d
+        self.i_sfh, self.chi2, self.z = self._parse_best_fit(fit_lines)
+
+        pdf_lines = self._detect_pdf_lines(fit_lines)
+
+        for magphys_param, startend in pdf_lines.iteritems():
+            param_name = self.magphys_params[magphys_param]
+            start = startend[0]
+            end = startend[1]
+            self._pdfs[param_name] = self._parse_pdf(fit_lines, start, end)
