@@ -73,9 +73,10 @@ class BaseReader(object):
     def _parse_best_fit(lines, index=8):
         parts = lines[index].strip().split()
         sfh_i = int(parts[0])
-        chi2 = float(parts[1])
-        z = float(parts[2])
-        return sfh_i, chi2, z
+        ir_i = int(parts[1])
+        chi2 = float(parts[2])
+        z = float(parts[3])
+        return sfh_i, ir_i, chi2, z
 
     @staticmethod
     def _parse_pdf(lines, start_n, percentile_n):
@@ -175,7 +176,8 @@ class MagphysFit(BaseReader):
             fit_lines)
         _, self.model_sed = self._parse_model_sed(fit_lines)
 
-        self.i_sfh, self.chi2, self.z = self._parse_best_fit(fit_lines)
+        self.i_sfh, self.i_ir, self.chi2, self.z = \
+            self._parse_best_fit(fit_lines)
 
         pdf_lines = self._detect_pdf_lines(fit_lines)
 
@@ -212,7 +214,8 @@ class EnhancedMagphysFit(BaseReader):
             fit_lines)
         _, self.model_sed = self._parse_model_sed(fit_lines)
 
-        self.i_sfh, self.chi2, self.z = self._parse_best_fit(fit_lines)
+        self.i_sfh, self.i_ir, self.chi2, self.z = \
+            self._parse_best_fit(fit_lines)
 
         pdf_lines = self._detect_pdf_lines(fit_lines)
 
@@ -272,3 +275,11 @@ class OpticalFit(BaseReader):
             start = startend[0]
             end = startend[1]
             self._pdfs[param_name] = self._parse_pdf(fit_lines, start, end)
+
+    @staticmethod
+    def _parse_best_fit(lines, index=8):
+        parts = lines[index].strip().split()
+        sfh_i = int(parts[0])
+        chi2 = float(parts[1])
+        z = float(parts[2])
+        return sfh_i, chi2, z
