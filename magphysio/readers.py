@@ -18,7 +18,7 @@ class BaseReader(object):
 
     # map magphys names to internal column names
     magphys_params = OrderedDict([
-        ('Z/Zo', 'Z/Zo'),
+        ('Z/Zo', 'Z_Zo'),
         ('tform', 'tform'),
         ('gamma', 'gamma'),
         ('t(lastB)', 't_lastB'),
